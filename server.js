@@ -10,26 +10,46 @@ const connectDB = require('./config/db');
 const app = express();
 
 // Allow requests from the Vite dev server and any configured origin
-const allowedOrigins = [
+const rawOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:3000',
-  'https://devsphare2.netlify.app/',
+  'https://devsphare2.netlify.app',
   process.env.FRONTEND_URL,
-].filter(Boolean);
+];
+
+const allowedOrigins = rawOrigins
+  .filter(Boolean)
+  .map(o => o.trim().replace(/\/+$/, ''));
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (curl, Postman, mobile apps)
+    // Allow requests with no origin (curl, Postman, mobile apps, Netlify proxy)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // In development, allow all localhost origins
-    if (process.env.NODE_ENV !== 'production' && /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+
+    const cleanOrigin = origin.trim().replace(/\/+$/, '');
+    if (allowedOrigins.includes(cleanOrigin)) {
       return callback(null, true);
     }
+
+    // Allow Netlify production and deploy previews
+    try {
+      const { hostname } = new URL(cleanOrigin);
+      if (hostname.endsWith('.netlify.app') || hostname === 'localhost') {
+        return callback(null, true);
+      }
+    } catch (_) {}
+
+    // In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production' && /^https?:\/\/localhost(:\d+)?$/.test(cleanOrigin)) {
+      return callback(null, true);
+    }
+
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 app.use(express.json({ limit: '10mb' }));
 app.set('trust proxy', 1);
@@ -69,3 +89,5 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`DevSphere server running on port ${PORT}`));
 });
+
+module.exports = app;
