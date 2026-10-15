@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 
 const app = express();
@@ -54,7 +55,45 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.set('trust proxy', 1);
 
-app.get('/api/health', (req, res) => res.json({ ok: true, message: 'DevSphere API operational' }));
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  let dbError = null;
+  try {
+    await connectDB();
+    dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'connecting';
+  } catch (err) {
+    dbStatus = 'error';
+    dbError = err.message;
+  }
+
+  res.json({
+    ok: dbStatus === 'connected',
+    message: dbStatus === 'connected' ? 'DevSphere API operational' : 'Database connection issue',
+    database: {
+      status: dbStatus,
+      error: dbError,
+      hasMongoUri: Boolean(process.env.MONGO_URI),
+      readyState: mongoose.connection.readyState,
+    },
+    env: {
+      hasJwtSecret: Boolean(process.env.JWT_SECRET),
+      hasFrontendUrl: Boolean(process.env.FRONTEND_URL),
+    },
+  });
+});
+
+// Middleware to ensure DB is connected before handling any API routes
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection error on request:', err.message);
+    return res.status(500).json({
+      error: `Database connection error: ${err.message}`,
+    });
+  }
+});
 
 // Auth & profile routes
 app.use('/api/auth', require('./routes/userRoutes'));          // POST /register, /login
