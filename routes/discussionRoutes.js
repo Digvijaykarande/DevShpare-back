@@ -1,0 +1,12 @@
+const express = require("express");
+const router = express.Router();
+const { protect, optionalProtect } = require("../middlewares/authMiddleware");
+const c = require("../controllers/discussionController");
+router.get("/stats", c.getDiscussionStats);
+router.get("/", optionalProtect, c.getDiscussions);
+router.post("/", protect, c.createDiscussion);
+router.get("/:id", optionalProtect, c.getDiscussion);
+router.post("/:id/vote", protect, c.voteDiscussion);
+router.post("/:id/answers", protect, c.addAnswer);
+router.post("/:id/answers/:answerId/accept", protect, c.acceptAnswer);
+module.exports = router;

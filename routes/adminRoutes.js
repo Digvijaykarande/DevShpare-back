@@ -1,0 +1,12 @@
+const express = require('express');
+const router = express.Router();
+const { requireAdmin } = require('../middlewares/adminMiddleware');
+const c = require('../controllers/adminController');
+router.use(requireAdmin);
+router.get('/me', c.me);
+router.get('/dashboard', c.dashboard);
+router.get('/:resource', c.list);
+router.post('/:resource', c.create);
+router.patch('/:resource/:id', c.update);
+router.delete('/:resource/:id', c.remove);
+module.exports = router;
